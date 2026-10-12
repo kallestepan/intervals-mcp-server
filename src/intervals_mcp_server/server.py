@@ -25,6 +25,7 @@ Usage:
         - get_activity_details
         - get_activity_intervals
         - get_activity_streams
+        - get_activity_segments
         - get_activity_messages
         - add_activity_message
         - get_events
@@ -83,6 +84,7 @@ from intervals_mcp_server.tools.activities import (  # pylint: disable=wrong-imp
     get_activity_details,
     get_activity_intervals,
     get_activity_messages,
+    get_activity_segments,
     get_activity_streams,
     get_activity_histogram,
 )
@@ -127,6 +129,7 @@ __all__ = [
     "get_activity_intervals",
     "get_activity_messages",
     "get_activity_streams",
+    "get_activity_segments",
     "get_activity_histogram",
     "get_events",
     "get_races",

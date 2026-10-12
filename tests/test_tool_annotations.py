@@ -29,6 +29,7 @@ EXPECTED_ANNOTATIONS = {
     "get_activity_details": {"title": "Get Activity Details", "readOnlyHint": True, "destructiveHint": False},
     "get_activity_intervals": {"title": "Get Activity Intervals", "readOnlyHint": True, "destructiveHint": False},
     "get_activity_streams": {"title": "Get Activity Streams", "readOnlyHint": True, "destructiveHint": False},
+    "get_activity_segments": {"title": "Get Activity Segments", "readOnlyHint": True, "destructiveHint": False},
     "get_activity_messages": {"title": "Get Activity Messages", "readOnlyHint": True, "destructiveHint": False},
     "add_activity_message": {"title": "Add Activity Message", "readOnlyHint": False, "destructiveHint": False},
     "get_events": {"title": "Get Events", "readOnlyHint": True, "destructiveHint": False},

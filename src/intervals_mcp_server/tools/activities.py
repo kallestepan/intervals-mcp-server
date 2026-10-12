@@ -386,6 +386,110 @@ async def get_activity_streams(
     return streams_summary
 
 
+def _mean(values: list[Any]) -> float | None:
+    """Average of the numeric values in a list, ignoring None. None if nothing numeric."""
+    nums = [v for v in values if isinstance(v, (int, float))]
+    return sum(nums) / len(nums) if nums else None
+
+
+def _fmt(value: float | None, decimals: int = 0) -> str:
+    return "-" if value is None else f"{value:.{decimals}f}"
+
+
+@mcp.tool(annotations=ToolAnnotations(title="Get Activity Segments", readOnlyHint=True, destructiveHint=False))
+async def get_activity_segments(
+    activity_id: str,
+    segment_seconds: int = 60,
+    start_seconds: int = 0,
+    end_seconds: int = 0,
+    api_key: str = "",
+) -> str:
+    """Get power, heart rate and cadence averaged per time segment, plus decoupling for a chosen window
+
+    Use this instead of get_activity_streams when you need to see how an activity developed over time,
+    for example where power was lowered, how heart rate drifted, or decoupling without warm-up and
+    cool-down.
+
+    Args:
+        activity_id: The Intervals.icu activity ID
+        segment_seconds: Length of each segment in seconds (optional, defaults to 60)
+        start_seconds: Start of the analysis window in seconds from the activity start (optional, defaults to 0)
+        end_seconds: End of the analysis window in seconds (optional, 0 means the end of the activity)
+        api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
+    """
+    if segment_seconds <= 0:
+        return "segment_seconds must be a positive number."
+
+    result = await make_intervals_request(
+        url=f"/activity/{activity_id}/streams",
+        api_key=api_key,
+        params={"types": "time,watts,heartrate,cadence"},
+    )
+
+    if isinstance(result, dict) and "error" in result:
+        error_message = result.get("message", "Unknown error")
+        return f"Error fetching activity streams: {error_message}"
+
+    streams = result if isinstance(result, list) else []
+    by_type = {s.get("type"): s.get("data") or [] for s in streams if isinstance(s, dict)}
+    watts = by_type.get("watts", [])
+    hr = by_type.get("heartrate", [])
+    cadence = by_type.get("cadence", [])
+    length = max(len(watts), len(hr), len(cadence))
+    if length == 0:
+        return f"No stream data found for activity {activity_id}."
+
+    time = by_type.get("time") or list(range(length))
+    time = list(time[:length]) + list(range(len(time), length))
+
+    window_end = end_seconds if end_seconds > 0 else time[-1] + 1
+    window = [i for i in range(length) if start_seconds <= time[i] < window_end]
+    if not window:
+        return f"No data between {start_seconds}s and {window_end}s for activity {activity_id}."
+
+    def pick(stream: list[Any], indices: list[int]) -> list[Any]:
+        return [stream[i] for i in indices if i < len(stream)]
+
+    lines = [
+        f"Activity Segments for {activity_id} ({segment_seconds}s segments, "
+        f"window {start_seconds}-{window_end}s):",
+        "",
+        "start | W | HR | rpm",
+    ]
+    seg_start = start_seconds
+    while seg_start < window_end:
+        seg_end = min(seg_start + segment_seconds, window_end)
+        idx = [i for i in window if seg_start <= time[i] < seg_end]
+        if idx:
+            label = f"{seg_start // 60}:{seg_start % 60:02d}"
+            lines.append(
+                f"{label} | {_fmt(_mean(pick(watts, idx)))} | {_fmt(_mean(pick(hr, idx)))} "
+                f"| {_fmt(_mean(pick(cadence, idx)))}"
+            )
+        seg_start = seg_end
+
+    half = len(window) // 2
+    first, second = window[:half], window[half:]
+    w1, h1 = _mean(pick(watts, first)), _mean(pick(hr, first))
+    w2, h2 = _mean(pick(watts, second)), _mean(pick(hr, second))
+
+    lines.append("")
+    lines.append(
+        f"Window average: {_fmt(_mean(pick(watts, window)))} W, {_fmt(_mean(pick(hr, window)))} bpm, "
+        f"{_fmt(_mean(pick(cadence, window)))} rpm"
+    )
+    lines.append(f"First half: {_fmt(w1)} W, {_fmt(h1)} bpm")
+    lines.append(f"Second half: {_fmt(w2)} W, {_fmt(h2)} bpm")
+    if w1 and h1 and w2 and h2:
+        ef1, ef2 = w1 / h1, w2 / h2
+        lines.append(f"Power:HR first {ef1:.3f}, second {ef2:.3f}")
+        lines.append(f"Decoupling (Pw:HR) in window: {(ef1 - ef2) / ef1 * 100:.1f}%")
+    else:
+        lines.append("Decoupling: not available (missing power or heart rate data)")
+
+    return "\n".join(lines)
+
+
 @mcp.tool(annotations=ToolAnnotations(title="Get Activity Messages", readOnlyHint=True, destructiveHint=False))
 async def get_activity_messages(activity_id: str, api_key: str = "") -> str:
     """Get messages (notes/comments) for a specific activity from Intervals.icu
