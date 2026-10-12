@@ -69,6 +69,7 @@ Analysing a completed activity:
   1. get_activities()              ← find the activity ID
   2. get_activity_details(id)      ← full metrics
   3. get_activity_intervals(id)    ← interval breakdown (if structured)
+  4. get_activity_segments(id)     ← minute-by-minute W/HR/cadence + decoupling for a window
 
 Planning / calendar management:
   1. get_events()                  ← view upcoming calendar
@@ -98,6 +99,7 @@ AVAILABLE TOOLS
   get_activity_details      Full metrics for a single activity.
   get_activity_intervals    Interval breakdown for a structured activity.
   get_activity_streams      Raw time-series streams (power, HR, cadence etc).
+  get_activity_segments     Per-segment W/HR/cadence and decoupling for a chosen window.
   get_wellness_data         Daily wellness entries (HRV, sleep, weight etc).
   get_events                Calendar events — planned workouts, races, notes.
   get_event_by_id           Single event detail.

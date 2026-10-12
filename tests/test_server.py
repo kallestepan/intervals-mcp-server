@@ -33,6 +33,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     get_activity_details,
     get_activity_intervals,
     get_activity_messages,
+    get_activity_segments,
     get_activity_streams,
     get_activity_histogram,
     get_athlete_power_curves,
@@ -695,6 +696,36 @@ def test_get_activity_streams(monkeypatch):
     assert "watts" in result
     assert "heartrate" in result
     assert "Data Points: 11" in result
+
+
+def test_get_activity_segments(monkeypatch):
+    """
+    Test get_activity_segments averages per segment and computes decoupling for a window.
+    """
+    # 4 minutes at 1 Hz: power falls from 200 to 170 W while HR stays at 140 bpm.
+    watts = [200] * 60 + [190] * 60 + [180] * 60 + [170] * 60
+    sample_streams = [
+        {"type": "time", "data": list(range(240))},
+        {"type": "watts", "data": watts},
+        {"type": "heartrate", "data": [140] * 240},
+        {"type": "cadence", "data": [None] + [90] * 239},
+    ]
+
+    async def fake_request(*_args, **_kwargs):
+        return sample_streams
+
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(get_activity_segments("i1"))
+    assert "0:00 | 200 | 140 | 90" in result
+    assert "3:00 | 170 | 140 | 90" in result
+    assert "Decoupling (Pw:HR) in window: 10.3%" in result
+
+    windowed = asyncio.run(get_activity_segments("i1", segment_seconds=120, start_seconds=120))
+    assert "window 120-240s" in windowed
+    assert "2:00 | 175 | 140 | 90" in windowed
+    assert "Decoupling (Pw:HR) in window: 5.6%" in windowed
 
 
 def test_add_or_update_event(monkeypatch):
